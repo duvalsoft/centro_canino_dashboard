@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+
+        <!-- Acción client que carga el componente OWL -->
+        <record id="action_centro_canino_dashboard" model="ir.actions.client">
+            <field name="name">Dashboard Centro Canino</field>
+            <field name="tag">centro_canino_dashboard.action_dashboard</field>
+        </record>
+
+        <!-- Ítem de menú en Tumburú > Residencia > Panel2 -->
+        <menuitem
+            id="menu_centro_canino_dashboard"
+            name="Panel Residencia"
+            parent="centro_canino_tumburu.menu_residencia"
+            action="action_centro_canino_dashboard"
+            sequence="1"
+        />
+
+    </data>
+</odoo>

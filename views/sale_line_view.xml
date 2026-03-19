@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+
+        <!-- ══ VISTA LISTA ══════════════════════════════════════════════ -->
+        <record id="view_sale_order_line_canino_tree" model="ir.ui.view">
+            <field name="name">sale.order.line.canino.tree</field>
+            <field name="model">sale.order.line</field>
+            <field name="arch" type="xml">
+                <tree string="Líneas de Pedido"
+                      decoration-success="state_reserva == 'in'"
+                      decoration-info="state_reserva == 'draft'"
+                      decoration-muted="state_reserva == 'out'"
+                      decoration-danger="state_reserva == 'cancel'">
+                    <field name="pet_name"            string="Perro"/>
+                    <field name="customer_name"       string="Tutor"/>
+                    <field name="service_subtype_id"  string="Subtipo"/>
+                    <field name="date_in"             string="Entrada"/>
+                    <field name="date_out"            string="Salida"/>
+                    <field name="state_reserva"       string="Estado"
+                           widget="badge"
+                           decoration-success="state_reserva == 'in'"
+                           decoration-info="state_reserva == 'draft'"
+                           decoration-warning="state_reserva == 'out'"
+                           decoration-danger="state_reserva == 'cancel'"/>
+                    <field name="order_id"            string="Pedido"/>
+                    <field name="price_subtotal"      string="Total"/>
+                    <!-- Campos ocultos necesarios para decorations -->
+                    <field name="state_reserva"       invisible="1"/>
+                </tree>
+            </field>
+        </record>
+
+        <!-- ══ VISTA BÚSQUEDA con filtro lateral por subtipo ═══════════ -->
+        <record id="view_sale_order_line_canino_search" model="ir.ui.view">
+            <field name="name">sale.order.line.canino.search</field>
+            <field name="model">sale.order.line</field>
+            <field name="arch" type="xml">
+                <search string="Buscar líneas">
+
+                    <!-- Barra de búsqueda -->
+                    <field name="pet_name"           string="Perro"/>
+                    <field name="customer_name"      string="Tutor"/>
+                    <field name="service_subtype_id" string="Subtipo"/>
+                    <field name="order_id"           string="Pedido"/>
+
+                    <!-- Filtros rápidos -->
+                    <filter string="In"       name="filter_in"      domain="[('state_reserva','=','in')]"/>
+                    <filter string="Reservas" name="filter_draft"   domain="[('state_reserva','=','draft')]"/>
+                    <filter string="Salidas"  name="filter_out"     domain="[('state_reserva','=','out')]"/>
+                    <separator/>
+                    <filter string="Entrada hoy"
+                            name="filter_hoy"
+                            domain="[('date_in','=', context_today().strftime('%Y-%m-%d'))]"/>
+                    <filter string="Esta semana"
+                            name="filter_semana"
+                            domain="[('date_in','&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+
+                    <!-- ★ PANEL LATERAL — un item por subtipo ★ -->
+                    <group expand="1" string="Tipo de Servicio">
+                        <filter string="Subtipo"
+                                name="group_subtipo"
+                                context="{'group_by': 'service_subtype_id'}"/>
+                    </group>
+
+                    <!-- Agrupaciones -->
+                    <group string="Agrupar por">
+                        <filter string="Subtipo"  name="grp_subtipo" context="{'group_by':'service_subtype_id'}"/>
+                        <filter string="Estado"   name="grp_estado"  context="{'group_by':'state_reserva'}"/>
+                        <filter string="Pedido"   name="grp_pedido"  context="{'group_by':'order_id'}"/>
+                        <filter string="Entrada"  name="grp_entrada" context="{'group_by':'date_in:month'}"/>
+                    </group>
+
+                </search>
+            </field>
+        </record>
+
+        <!-- ══ ACCIÓN ════════════════════════════════════════════════════ -->
+        <record id="action_sale_order_line_canino" model="ir.actions.act_window">
+            <field name="name">Líneas de Pedido</field>
+            <field name="res_model">sale.order.line</field>
+            <field name="view_mode">tree,form</field>
+            <field name="view_id" ref="view_sale_order_line_canino_tree"/>
+            <field name="search_view_id" ref="view_sale_order_line_canino_search"/>
+            <!-- Activa el panel lateral de filtros por defecto -->
+            <field name="context">{
+                'search_default_group_subtipo': 0
+            }</field>
+            <field name="domain">[]</field>
+        </record>
+
+        <!-- ══ MENÚ dentro de Ventas ════════════════════════════════════ -->
+        <menuitem
+            id="menu_sale_order_line_canino"
+            name="Líneas de Pedido"
+            parent="sale.sale_order_menu"
+            action="action_sale_order_line_canino"
+            sequence="20"
+        />
+
+    </data>
+</odoo>
