@@ -11,8 +11,8 @@
         <!-- Ítem de menú en Tumburú > Residencia > Panel2 -->
         <menuitem
             id="menu_centro_canino_dashboard"
-            name="Panel Residencia"
-            parent="centro_canino_tumburu.menu_residencia"
+            name="Panel"
+            parent="centro_canino_tumburu.menu_pet"
             action="action_centro_canino_dashboard"
             sequence="1"
         />
