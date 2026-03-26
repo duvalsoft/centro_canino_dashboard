@@ -93,24 +93,31 @@
                 <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/>
               </svg>
             </div>
-            <span class="cc-metric-label">Check-ins pendientes</span>
-            <span t-att-class="state.data.hoy.pending_checkins > 0 ? 'cc-metric-value cc-warn' : 'cc-metric-value'">
-              <t t-esc="state.data.hoy.pending_checkins"/>
+            <span class="cc-metric-label">Entradas hoy</span>
+            <span class="cc-metric-value">
+              <t t-esc="state.data.hoy.checkin_realizados"/>/<t t-esc="state.data.hoy.checkin_previstos"/>
+            </span>
+            <span class="cc-metric-sub">
+              Pendientes:
+              <t t-esc="state.data.hoy.checkin_pendientes"/>
             </span>
           </div>
 
-          <div class="cc-metric" t-on-click="() => openOcupaciones('checkout')">
-            <div class="cc-metric-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
-              </svg>
+            <div class="cc-metric" t-on-click="() => openOcupaciones('checkout')">
+              <div class="cc-metric-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+                </svg>
+              </div>
+              <span class="cc-metric-label">Salidas hoy</span>
+              <span class="cc-metric-value">
+                <t t-esc="state.data.hoy.checkout_realizados"/>/<t t-esc="state.data.hoy.checkout_previstos"/>
+              </span>
+              <span class="cc-metric-sub">
+                Pendientes:
+                <t t-esc="state.data.hoy.checkout_pendientes"/>
+              </span>
             </div>
-            <span class="cc-metric-label">Check-outs pendientes</span>
-            <span t-att-class="state.data.hoy.pending_checkouts > 0 ? 'cc-metric-value cc-warn' : 'cc-metric-value'">
-              <t t-esc="state.data.hoy.pending_checkouts"/>
-            </span>
-          </div>
-
           <div class="cc-metric cc-metric-alert"
                t-att-class="state.data.hoy.alertas_medicas > 0 ? 'cc-metric cc-metric-alert' : 'cc-metric'"
                t-on-click="() => openOcupaciones('alertas')">

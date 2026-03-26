@@ -197,10 +197,18 @@ class CentroCaninoDashboard extends Component {
         }
 
         const domains = {
-            "checkin":  [["estado", "=", "1_reservas"], ["fecha_entrada_date", "=", hoy]],
-            "checkout": [["estado", "=", "2_in"], ["fecha_salida_date", "=", hoy]],
-            "reservas": [["estado", "=", "1_reservas"]],
-        };
+                "checkin": [
+                    ["fecha_entrada_date", "=", hoy],
+                    ["estado", "!=", "4_cancelada"],
+                ],
+                "checkout": [
+                    ["fecha_salida_date", "=", hoy],
+                    ["estado", "!=", "4_cancelada"],
+                ],
+                "reservas": [
+                    ["estado", "=", "1_reservas"],
+                ],
+            };
 
         await this.actionService.doAction({
             type:      "ir.actions.act_window",

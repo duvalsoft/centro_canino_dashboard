@@ -57,15 +57,39 @@ class CentroCaninoDashboard(models.AbstractModel):
         total_bungalows = self.env['centro_canino_tumburu.bungalow'].search_count([])
         tasa_ocupacion = round((ocupaciones_in / total_bungalows * 100), 2) if total_bungalows else 0
 
-        pending_checkins = Ocup.search_count([
-            ('estado', '=', '1_reservas'),
+        # PREVISTOS HOY (todos los que deberían entrar)
+        checkin_previstos = Ocup.search_count([
+            ('estado', '!=', '4_cancelada'),
             ('fecha_entrada_date', '=', hoy),
         ] + ([('service_subtype_id', '=', int(filtro_subtipo))] if filtro_subtipo else []))
 
-        pending_checkouts = Ocup.search_count([
-            ('estado', '=', '2_in'),
+
+        # REALIZADOS HOY (ya han entrado)
+        checkin_realizados = Ocup.search_count([
+            ('estado', 'in', ['2_in', '3_salidas']),
+            ('fecha_entrada_date', '=', hoy),
+        ] + ([('service_subtype_id', '=', int(filtro_subtipo))] if filtro_subtipo else []))
+
+
+        # PENDIENTES
+        pending_checkins = max(0, checkin_previstos - checkin_realizados)
+
+        # PREVISTOS HOY
+        checkout_previstos = Ocup.search_count([
+            ('estado', '!=', '4_cancelada'),
             ('fecha_salida_date', '=', hoy),
         ] + ([('service_subtype_id', '=', int(filtro_subtipo))] if filtro_subtipo else []))
+
+
+        # REALIZADOS HOY
+        checkout_realizados = Ocup.search_count([
+            ('estado', '=', '3_salidas'),
+            ('fecha_salida_date', '=', hoy),
+        ] + ([('service_subtype_id', '=', int(filtro_subtipo))] if filtro_subtipo else []))
+
+
+        # PENDIENTES
+        pending_checkouts = max(0, checkout_previstos - checkout_realizados)
 
         # Cuidados especiales: perros dentro con atención médica o comida propia
         alertas_medicas = Ocup.search_count([
@@ -78,8 +102,12 @@ class CentroCaninoDashboard(models.AbstractModel):
         hoy_data = {
             'ocupaciones_in':    ocupaciones_in,
             'tasa_ocupacion':    tasa_ocupacion,
-            'pending_checkins':  pending_checkins,
-            'pending_checkouts': pending_checkouts,
+            'checkin_previstos': checkin_previstos,
+            'checkin_realizados': checkin_realizados,
+            'checkin_pendientes': pending_checkins,
+            'checkout_previstos': checkout_previstos,
+            'checkout_realizados': checkout_realizados,
+            'checkout_pendientes': pending_checkouts,
             'alertas_medicas':   alertas_medicas,
             'total_bungalows':   total_bungalows,
         }
@@ -195,9 +223,10 @@ class CentroCaninoDashboard(models.AbstractModel):
             'subtipos':                subtipos,
             'bonos_activos':           self.env['sale.order.line'].search_count([
                 ('is_voucher', '=', True),
-                ('sesiones_restantes', '>', 0),
+                ('order_id.state', 'in', ['sale', 'done']),
+                ('estado_bono', '=', 'activo'),
             ]),
-            'user_is_manager':         self.env.user.has_group(      # ← NUEVO
+            'user_is_manager':         self.env.user.has_group(
                 'centro_canino_tumburu.group_pet_sitter_manager'
             ),
         }

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.swp
+*.tmp
+.DS_Store
+*.egg-info
+node_modules
+.vscode
