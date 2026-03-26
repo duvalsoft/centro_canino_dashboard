@@ -112,6 +112,36 @@ class CentroCaninoDashboard(models.AbstractModel):
             'total_bungalows':   total_bungalows,
         }
 
+         # ================================================================ #
+        #  SECCIÓN: ESCUELAS                                              #
+        # ================================================================ #
+        Matricula = self.env['escuela.matricula']
+        Sesion = self.env['escuela.sesion']
+ 
+        matriculas_activas = Matricula.search_count([
+            ('state', '=', 'activa'),
+        ])
+ 
+        perros_en_centro_escuela = Matricula.search_count([
+            ('state', '=', 'activa'),
+            ('perro_en_centro', '=', True),
+        ])
+ 
+        # Sesiones que empiezan hoy (fecha_start entre 00:00 y 23:59 de hoy)
+        hoy_inicio = fields.Datetime.from_string(str(hoy) + ' 00:00:00')
+        hoy_fin    = fields.Datetime.from_string(str(hoy) + ' 23:59:59')
+        sesiones_hoy = Sesion.search_count([
+            ('date_start', '>=', hoy_inicio),
+            ('date_start', '<=', hoy_fin),
+            ('state', '!=', 'finished'),
+        ])
+ 
+        escuelas_data = {
+            'matriculas_activas':       matriculas_activas,
+            'perros_en_centro_escuela': perros_en_centro_escuela,
+            'sesiones_hoy':             sesiones_hoy,
+        }
+
         # ================================================================ #
         #  SECCIÓN: PERIODO                                                #
         # ================================================================ #
@@ -214,6 +244,7 @@ class CentroCaninoDashboard(models.AbstractModel):
         # ================================================================ #
         return {
             'hoy':                     hoy_data,
+            'escuelas':                escuelas_data,
             'periodo':                 periodo_data,
             'grafica_diaria':          grafica_diaria,
             'grafica_subtipo':         grafica_subtipo,

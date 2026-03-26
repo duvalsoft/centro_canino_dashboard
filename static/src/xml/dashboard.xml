@@ -149,6 +149,61 @@
 
         </div>
       </div>
+      <!-- ════════════════════════════════════════════════════════════════
+           FILA ESCUELAS — Visible para todos
+      ═══════════════════════════════════════════════════════════════════ -->
+      <t t-if="state.data.escuelas">
+        <div class="cc-section">
+          <span class="cc-badge cc-badge-escuela">🎓 Escuelas</span>
+          <div class="cc-metrics">
+
+            <div class="cc-metric"
+                 t-on-click="() => openEscuelas('activas')">
+              <div class="cc-metric-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                  <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                </svg>
+              </div>
+              <span class="cc-metric-label">Matrículas activas</span>
+              <span t-att-class="state.data.escuelas.matriculas_activas > 0 ? 'cc-metric-value cc-positive' : 'cc-metric-value'">
+                <t t-esc="state.data.escuelas.matriculas_activas"/>
+              </span>
+            </div>
+
+            <div class="cc-metric"
+                 t-on-click="() => openEscuelas('en_centro')">
+              <div class="cc-metric-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                  <path d="M9 22V12h6v10"/>
+                  <circle cx="12" cy="7" r="1" fill="currentColor"/>
+                </svg>
+              </div>
+              <span class="cc-metric-label">Perros en centro</span>
+              <span t-att-class="state.data.escuelas.perros_en_centro_escuela > 0 ? 'cc-metric-value cc-teal' : 'cc-metric-value'">
+                <t t-esc="state.data.escuelas.perros_en_centro_escuela"/>
+              </span>
+            </div>
+
+            <div class="cc-metric"
+                 t-on-click="() => openEscuelas('sesiones_hoy')">
+              <div class="cc-metric-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/>
+                  <path d="M16 2v4M8 2v4M3 10h18"/>
+                  <circle cx="12" cy="16" r="2" fill="currentColor"/>
+                </svg>
+              </div>
+              <span class="cc-metric-label">Sesiones hoy</span>
+              <span t-att-class="state.data.escuelas.sesiones_hoy > 0 ? 'cc-metric-value cc-warn' : 'cc-metric-value'">
+                <t t-esc="state.data.escuelas.sesiones_hoy"/>
+              </span>
+            </div>
+
+          </div>
+        </div>
+      </t>
 
       <!-- ════════════════════════════════════════════════════════════════
            FILA 2 – KPIs PERIODO

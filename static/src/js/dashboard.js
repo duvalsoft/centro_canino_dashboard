@@ -96,6 +96,7 @@ class CentroCaninoDashboard extends Component {
         this.onPeriodoChange  = this.onPeriodoChange.bind(this);
         this.onSubtipoChange  = this.onSubtipoChange.bind(this);
         this.onRefresh        = this.onRefresh.bind(this);
+        this.openEscuelas = this.openEscuelas.bind(this);
 
         onWillStart(() => this._loadData());
     }
@@ -177,7 +178,45 @@ class CentroCaninoDashboard extends Component {
             "centro_canino_tumburu.action_sale_order_line_bono"
         );
     }
-
+        async openEscuelas(filtro) {
+        const dominios = {
+            'activas': {
+                name:   'Matrículas Activas',
+                model:  'escuela.matricula',
+                domain: [['state', '=', 'activa']],
+                views:  [[false, 'kanban'], [false, 'list'], [false, 'form']],
+            },
+            'en_centro': {
+                name:   'Perros en Centro con Matrícula',
+                model:  'escuela.matricula',
+                domain: [['state', '=', 'activa'], ['perro_en_centro', '=', true]],
+                views:  [[false, 'kanban'], [false, 'list'], [false, 'form']],
+            },
+            'sesiones_hoy': {
+                name:   'Sesiones de Hoy',
+                model:  'escuela.sesion',
+                domain: [
+                    ['date_start', '>=', new Date().toISOString().slice(0, 10) + ' 00:00:00'],
+                    ['date_start', '<=', new Date().toISOString().slice(0, 10) + ' 23:59:59'],
+                    ['state', '!=', 'finished'],
+                ],
+                views:  [[false, 'list'], [false, 'form']],
+            },
+        };
+ 
+        const cfg = dominios[filtro];
+        if (!cfg) return;
+ 
+        await this.actionService.doAction({
+            type:      'ir.actions.act_window',
+            name:      cfg.name,
+            res_model: cfg.model,
+            view_mode: cfg.views.map(v => v[1]).join(','),
+            views:     cfg.views,
+            domain:    cfg.domain,
+            target:    'current',
+        });
+    }
     async openOcupaciones(filtro) {
         const hoy = new Date().toISOString().slice(0, 10);
 
