@@ -1,54 +1,4 @@
 /** @odoo-module **/
-/**
- * PARCHE PARA dashboard.js (centro_canino_dashboard)
- *
- * Añade el botón "🎟️ Bonos" al panel de control.
- * Copia este método openBonos dentro de la clase CentroCaninoDashboard,
- * y añade el binding en setup().
- *
- * ─────────────────────────────────────────────────────────────────────
- * CAMBIOS EN setup():
- *
- *   this.openBonos = this.openBonos.bind(this);
- *
- * ─────────────────────────────────────────────────────────────────────
- * NUEVO MÉTODO (añadir junto a openOcupaciones):
- */
-
-// async openBonos() {
-//     await this.actionService.doAction(
-//         "centro_canino_tumburu.action_bonos_activos"
-//     );
-// }
-
-/**
- * ─────────────────────────────────────────────────────────────────────
- * CAMBIOS EN LA PLANTILLA XML del dashboard (Dashboard.xml):
- *
- * Dentro del bloque de botones/tarjetas de estadísticas, añadir:
- *
- *   <button class="btn btn-outline-warning btn-lg"
- *           t-on-click="() => openBonos()">
- *       🎟️ Bonos
- *       <span class="badge bg-warning text-dark ms-1"
- *             t-if="state.data and state.data.bonos_activos">
- *           <t t-esc="state.data.bonos_activos"/>
- *       </span>
- *   </button>
- *
- * ─────────────────────────────────────────────────────────────────────
- * CAMBIOS EN el controlador Python del dashboard
- * (CentroCaninoDashboardController / centro_canino.dashboard):
- *
- * En get_dashboard_data(), añadir al dict de retorno:
- *
- *   'bonos_activos': self.env['sale.order.line'].search_count([
- *       ('is_voucher', '=', True),
- *       ('sesiones_restantes', '>', 0),
- *   ]),
- *
- * ─────────────────────────────────────────────────────────────────────
- */
 
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
@@ -68,6 +18,7 @@ const ESTADO_LABELS = {
     "3_salidas":  "Salida",
     "4_cancelada":"Cancelada",
 };
+
 const ESTADO_CLASS = {
     "1_reservas": "badge-reserva",
     "2_in":       "badge-in",
@@ -89,25 +40,31 @@ class CentroCaninoDashboard extends Component {
             filtroSubtipo: null,
             data:          null,
             error:         null,
-            searchText:     "",
-            searchResults:  null,
-            searchLoading:  false,
+            searchText:    "",
+            searchStep:    "idle",
+            candidates:    [],
+            searchResults: null,
+            searchLoading: false,
+            selectedPet:   null,
         });
 
-
-
-
         this.openOcupaciones  = this.openOcupaciones.bind(this);
-        this.openBonos        = this.openBonos.bind(this);   // ← NUEVO
+        this.openBonos        = this.openBonos.bind(this);
         this.onPeriodoChange  = this.onPeriodoChange.bind(this);
         this.onSubtipoChange  = this.onSubtipoChange.bind(this);
         this.onRefresh        = this.onRefresh.bind(this);
-        this.openEscuelas = this.openEscuelas.bind(this);
-        this.onSearchInput  = this.onSearchInput.bind(this);
-        this.clearSearch    = this.clearSearch.bind(this);
+        this.openEscuelas     = this.openEscuelas.bind(this);
+        this.onSearchInput    = this.onSearchInput.bind(this);
+        this.clearSearch      = this.clearSearch.bind(this);
+        this.selectCandidate  = this.selectCandidate.bind(this);
+        this.openSearchResult = this.openSearchResult.bind(this);
 
         onWillStart(() => this._loadData());
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CARGA DE DATOS DEL DASHBOARD
+    // ═══════════════════════════════════════════════════════════════════
 
     async _loadData() {
         this.state.loading = true;
@@ -129,42 +86,47 @@ class CentroCaninoDashboard extends Component {
     _processData(data) {
         if (!data) return data;
         data.periodo.ingresos_fmt = formatCurrency(data.periodo.ingresos);
-        data.ultimas = (data.ultimas || []).map(o => ({
-            ...o,
-            estado_label: ESTADO_LABELS[o.estado] || o.estado,
-            estado_class: ESTADO_CLASS[o.estado]  || "badge-reserva",
-        }));
+        data.ultimas = (data.ultimas || []).map(function(o) {
+            return Object.assign({}, o, {
+                estado_label: ESTADO_LABELS[o.estado] || o.estado,
+                estado_class: ESTADO_CLASS[o.estado]  || "badge-reserva",
+            });
+        });
         data.grafica_subtipo = this._calcDonutSegments(data.grafica_subtipo || []);
-        const maxDia = Math.max(...(data.grafica_diaria || []).map(d => d.reservas), 1);
-        data.grafica_diaria = (data.grafica_diaria || []).map(d => ({
-            ...d,
-            pct: Math.round((d.reservas / maxDia) * 100),
-        }));
+        const maxDia = Math.max.apply(
+            null,
+            (data.grafica_diaria || []).map(function(d) { return d.reservas; }).concat([1])
+        );
+        data.grafica_diaria = (data.grafica_diaria || []).map(function(d) {
+            return Object.assign({}, d, {
+                pct: Math.round((d.reservas / maxDia) * 100),
+            });
+        });
         data.grafica_ingresos_mes    = data.grafica_ingresos_mes    || [];
         data.grafica_ocupaciones_mes = data.grafica_ocupaciones_mes || [];
-
-        // ← NUEVO: bonos_activos ya viene del backend
-        data.bonos_activos = data.bonos_activos || 0;
-
+        data.bonos_activos           = data.bonos_activos           || 0;
         return data;
     }
 
     _calcDonutSegments(subtipos) {
-        const r = 54;
+        const r      = 54;
         const circum = 2 * Math.PI * r;
         let acumulado = 0;
-        return subtipos.map(s => {
+        return subtipos.map(function(s) {
             const dash   = (s.pct / 100) * circum;
             const gap    = circum - dash;
             const offset = -(acumulado / 100) * circum;
             acumulado   += s.pct;
-            return {
-                ...s,
-                dash_array:  `${dash.toFixed(2)} ${gap.toFixed(2)}`,
+            return Object.assign({}, s, {
+                dash_array:  dash.toFixed(2) + " " + gap.toFixed(2),
                 dash_offset: offset.toFixed(2),
-            };
+            });
         });
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CONTROLES DEL DASHBOARD
+    // ═══════════════════════════════════════════════════════════════════
 
     onPeriodoChange(ev) {
         this.state.periodo = ev.target.value;
@@ -179,109 +141,57 @@ class CentroCaninoDashboard extends Component {
     onRefresh() {
         this._loadData();
     }
-    onSearchInput(ev) {
-        const text = ev.target.value || "";
-        this.state.searchText = text;
 
-        // Limpiar si borra el texto
-        if (text.length < 3) {
-            this.state.searchResults = null;
-            return;
-        }
+    // ═══════════════════════════════════════════════════════════════════
+    // NAVEGACIÓN
+    // ═══════════════════════════════════════════════════════════════════
 
-        // Debounce: espera 400ms desde la última tecla
-        clearTimeout(this._searchTimeout);
-        this._searchTimeout = setTimeout(() => {
-            this._doSearch(text);
-        }, 400);
-    }
-
-    async _doSearch(text) {
-        this.state.searchLoading = true;
-        try {
-            const results = await this.rpc(
-                "/centro_canino/dashboard/search", { text }
-            );
-            this.state.searchResults = results;
-        } catch (e) {
-            console.error("Search error:", e);
-            this.state.searchResults = null;
-        } finally {
-            this.state.searchLoading = false;
-        }
-    }
-
-    clearSearch() {
-        this.state.searchText    = "";
-        this.state.searchResults = null;
-    }
-
-    async openSearchResult(result) {
-        if (!result.source_model || !result.source_id) return;
-
-        // Caso especial: confirmar pedido y hacer checkin
-        if (result.accion === "confirmar_checkin") {
-            await this.rpc(
-                "/centro_canino/dashboard/confirmar_checkin",
-                { order_id: result.source_id, pet_id: result.pet_id }
-            );
-        }
-
-        await this.actionService.doAction({
-            type:      "ir.actions.act_window",
-            res_model: result.source_model,
-            res_id:    result.source_id,
-            view_mode: "form",
-            views:     [[false, "form"]],
-            target:    "current",
-        });
-    }
-
-    // ── NUEVO: abre la vista de bonos activos ────────────────────────────
     async openBonos() {
         await this.actionService.doAction(
             "centro_canino_tumburu.action_sale_order_line_bono"
         );
     }
-        async openEscuelas(filtro) {
+
+    async openEscuelas(filtro) {
         const dominios = {
-            'activas': {
-                name:   'Matrículas Activas',
-                model:  'escuela.matricula',
-                domain: [['state', '=', 'activa']],
-                views:  [[false, 'kanban'], [false, 'list'], [false, 'form']],
+            activas: {
+                name:   "Matrículas Activas",
+                model:  "escuela.matricula",
+                domain: [["state", "=", "activa"]],
+                views:  [[false, "kanban"], [false, "list"], [false, "form"]],
             },
-            'en_centro': {
-                name:   'Perros en Centro con Matrícula',
-                model:  'escuela.matricula',
-                domain: [['state', '=', 'activa'], ['perro_en_centro', '=', true]],
-                views:  [[false, 'kanban'], [false, 'list'], [false, 'form']],
+            en_centro: {
+                name:   "Perros en Centro con Matrícula",
+                model:  "escuela.matricula",
+                domain: [["state", "=", "activa"], ["perro_en_centro", "=", true]],
+                views:  [[false, "kanban"], [false, "list"], [false, "form"]],
             },
-            'sesiones_hoy': {
-                name:   'Sesiones de Hoy',
-                model:  'escuela.sesion',
+            sesiones_hoy: {
+                name:   "Sesiones de Hoy",
+                model:  "escuela.sesion",
                 domain: [
-                    ['date_start', '>=', new Date().toISOString().slice(0, 10) + ' 00:00:00'],
-                    ['date_start', '<=', new Date().toISOString().slice(0, 10) + ' 23:59:59'],
-                    ['state', '!=', 'finished'],
+                    ["date_start", ">=", new Date().toISOString().slice(0, 10) + " 00:00:00"],
+                    ["date_start", "<=", new Date().toISOString().slice(0, 10) + " 23:59:59"],
+                    ["state", "!=", "finished"],
                 ],
-                views:  [[false, 'list'], [false, 'form']],
+                views:  [[false, "list"], [false, "form"]],
             },
         };
- 
+
         const cfg = dominios[filtro];
         if (!cfg) return;
- 
+
         await this.actionService.doAction({
-            type:      'ir.actions.act_window',
+            type:      "ir.actions.act_window",
             name:      cfg.name,
             res_model: cfg.model,
-            view_mode: cfg.views.map(v => v[1]).join(','),
+            view_mode: cfg.views.map(function(v) { return v[1]; }).join(","),
             views:     cfg.views,
             domain:    cfg.domain,
-            target:    'current',
+            target:    "current",
         });
     }
+
     async openOcupaciones(filtro) {
         const hoy = new Date().toISOString().slice(0, 10);
 
@@ -292,7 +202,6 @@ class CentroCaninoDashboard extends Component {
             return;
         }
 
-        // "in" abre la misma vista que el menú HOY (kanban dashboard agrupado por estado)
         if (filtro === "in") {
             await this.actionService.doAction(
                 "centro_canino_tumburu.action_ocupacion_hoy"
@@ -301,18 +210,18 @@ class CentroCaninoDashboard extends Component {
         }
 
         const domains = {
-                "checkin": [
-                    ["fecha_entrada_date", "=", hoy],
-                    ["estado", "!=", "4_cancelada"],
-                ],
-                "checkout": [
-                    ["fecha_salida_date", "=", hoy],
-                    ["estado", "!=", "4_cancelada"],
-                ],
-                "reservas": [
-                    ["estado", "=", "1_reservas"],
-                ],
-            };
+            checkin: [
+                ["fecha_entrada_date", "=", hoy],
+                ["estado", "!=", "4_cancelada"],
+            ],
+            checkout: [
+                ["fecha_salida_date", "=", hoy],
+                ["estado", "!=", "4_cancelada"],
+            ],
+            reservas: [
+                ["estado", "=", "1_reservas"],
+            ],
+        };
 
         await this.actionService.doAction({
             type:      "ir.actions.act_window",
@@ -322,6 +231,110 @@ class CentroCaninoDashboard extends Component {
             views:     [[false, "kanban"], [false, "tree"], [false, "form"]],
             domain:    domains[filtro] || [],
             context:   { group_by: "estado", order: "jaula_actual asc" },
+            target:    "current",
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // BÚSQUEDA DE RECEPCIÓN
+    // ═══════════════════════════════════════════════════════════════════
+
+    onSearchInput(ev) {
+        const text = ev.target.value || "";
+        this.state.searchText = text;
+
+        if (text.length < 3) {
+            this.state.searchStep    = "idle";
+            this.state.candidates    = [];
+            this.state.searchResults = null;
+            this.state.selectedPet   = null;
+            return;
+        }
+
+        clearTimeout(this._searchTimeout);
+        const self = this;
+        this._searchTimeout = setTimeout(function() {
+            self._doCandidateSearch(text);
+        }, 400);
+    }
+
+    async _doCandidateSearch(text) {
+        this.state.searchLoading = true;
+        try {
+            const res = await this.rpc(
+                "/centro_canino/dashboard/search_candidates",
+                { text: text }
+            );
+            if (res.length === 1) {
+                await this._loadOperativeCard(res[0]);
+            } else if (res.length > 1) {
+                this.state.candidates = res;
+                this.state.searchStep = "disambiguating";
+            } else {
+                this.state.candidates    = [];
+                this.state.searchStep    = "no_results";
+                this.state.searchResults = null;
+            }
+        } catch (e) {
+            console.error("Candidate search error:", e);
+        } finally {
+            this.state.searchLoading = false;
+        }
+    }
+
+    async selectCandidate(candidate) {
+        this.state.selectedPet   = candidate;
+        this.state.searchLoading = true;
+        await this._loadOperativeCard(candidate);
+    }
+
+    async _loadOperativeCard(candidate) {
+        this.state.searchLoading = true;
+        try {
+            const res = await this.rpc(
+                "/centro_canino/dashboard/search_operative",
+                {
+                    partner_id: candidate.partner_id,
+                    pet_id:     candidate.pet_id,
+                }
+            );
+            this.state.searchResults = res;
+            this.state.searchStep    = "results";
+            this.state.selectedPet   = candidate;
+        } catch (e) {
+            console.error("Operative card error:", e);
+        } finally {
+            this.state.searchLoading = false;
+        }
+    }
+
+    clearSearch() {
+        this.state.searchText    = "";
+        this.state.searchStep    = "idle";
+        this.state.candidates    = [];
+        this.state.searchResults = null;
+        this.state.selectedPet   = null;
+    }
+
+    async openSearchResult(result) {
+        if (!result.source_model || !result.source_id) return;
+
+        if (result.accion === "confirmar_checkin") {
+            await this.rpc(
+                "/centro_canino/dashboard/confirmar_checkin",
+                {
+                    order_id: result.source_id,
+                    pet_id:   result.pet_id || null,
+                }
+            );
+        }
+
+        await this.actionService.doAction({
+            type:      "ir.actions.act_window",
+            res_model: result.source_model,
+            res_id:    result.source_id,
+            view_mode: "form",
+            views:     [[false, "form"]],
             target:    "current",
         });
     }
