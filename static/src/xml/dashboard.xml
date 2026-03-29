@@ -14,7 +14,130 @@
   <!-- ── DASHBOARD ────────────────────────────────────────────────────── -->
   <t t-elif="state.data">
     <div class="cc-dashboard">
+<!-- ════════════════════════════════════════════════════════════════
+     BUSCADOR DE RECEPCIÓN — siempre visible
+═══════════════════════════════════════════════════════════════════ -->
+<div class="cc-search-bar">
+    <div class="cc-search-input-wrap">
+        <span class="cc-search-icon">🔍</span>
+        <input type="text"
+               class="cc-search-input"
+               placeholder="Cliente, teléfono, perro..."
+               t-att-value="state.searchText"
+               t-on-input="onSearchInput"/>
+        <button t-if="state.searchText"
+                class="cc-search-clear"
+                t-on-click="clearSearch">✕</button>
+    </div>
 
+    <!-- Spinner -->
+    <t t-if="state.searchLoading">
+        <div class="cc-search-searching">Buscando...</div>
+    </t>
+
+    <!-- Resultados -->
+    <t t-elif="state.searchResults">
+
+        <!-- Cliente -->
+        <t t-if="state.searchResults.cliente">
+            <div class="cc-search-cliente">
+                <span class="cc-search-cliente-name">
+                    <t t-esc="state.searchResults.cliente"/>
+                </span>
+                <t t-if="state.searchResults.pets">
+                    <span class="cc-search-pets">
+                        🐾 <t t-esc="state.searchResults.pets"/>
+                    </span>
+                </t>
+            </div>
+        </t>
+
+        <!-- HAY RESULTADOS -->
+        <t t-if="state.searchResults &amp;&amp; state.searchResults.items &amp;&amp; state.searchResults.items.length &gt; 0">
+
+            <!-- VIVOS -->
+            <t t-set="vivos" t-value="state.searchResults.items.filter(i =&gt; i.bloque === 'vivo')"/>
+            <t t-if="vivos.length &gt; 0">
+                <div class="cc-search-section-label cc-search-label-vivo">
+                    🟢 En el centro ahora
+                </div>
+                <t t-foreach="vivos" t-as="item" t-key="item.source_id">
+                    <div class="cc-search-result-card cc-search-card-vivo"
+                         t-on-click="() => openSearchResult(item)">
+                        <div class="cc-search-card-left">
+                            <span class="cc-search-card-pet">🐾 <t t-esc="item.pet"/></span>
+                            <span class="cc-search-card-desc"><t t-esc="item.titulo"/></span>
+                            <span class="cc-search-card-sub"><t t-esc="item.descripcion"/></span>
+                        </div>
+                        <div class="cc-search-card-right">
+                            <span class="cc-search-card-fecha"><t t-esc="item.fecha_display"/></span>
+                            <span class="cc-search-card-accion">
+                                <t t-esc="item.accion_label"/> →
+                            </span>
+                        </div>
+                    </div>
+                </t>
+            </t>
+
+            <!-- ESPERA -->
+            <t t-set="espera" t-value="state.searchResults.items.filter(i =&gt; i.bloque === 'espera')"/>
+            <t t-if="espera.length &gt; 0">
+                <div class="cc-search-section-label cc-search-label-espera">
+                    🟡 Pendientes de confirmar
+                </div>
+                <t t-foreach="espera" t-as="item" t-key="item.source_id">
+                    <div class="cc-search-result-card cc-search-card-espera"
+                         t-on-click="() => openSearchResult(item)">
+                        <div class="cc-search-card-left">
+                            <span class="cc-search-card-pet">🐾 <t t-esc="item.pet"/></span>
+                            <span class="cc-search-card-desc"><t t-esc="item.titulo"/></span>
+                            <span class="cc-search-card-sub"><t t-esc="item.descripcion"/></span>
+                        </div>
+                        <div class="cc-search-card-right">
+                            <span class="cc-search-card-fecha"><t t-esc="item.fecha_display"/></span>
+                            <span class="cc-search-card-accion cc-search-accion-alert">
+                                <t t-esc="item.accion_label"/> →
+                            </span>
+                        </div>
+                    </div>
+                </t>
+            </t>
+
+            <!-- HISTÓRICO -->
+            <t t-set="historico" t-value="state.searchResults.items.filter(i =&gt; i.bloque === 'historico')"/>
+            <t t-if="historico.length &gt; 0">
+                <div class="cc-search-section-label cc-search-label-historico">
+                    ⚫ Historial reciente
+                </div>
+                <t t-foreach="historico" t-as="item" t-key="item.source_id">
+                    <div class="cc-search-result-card cc-search-card-historico"
+                         t-on-click="() => openSearchResult(item)">
+                        <div class="cc-search-card-left">
+                            <span class="cc-search-card-pet">🐾 <t t-esc="item.pet"/></span>
+                            <span class="cc-search-card-desc"><t t-esc="item.titulo"/></span>
+                            <span class="cc-search-card-sub"><t t-esc="item.descripcion"/></span>
+                        </div>
+                        <div class="cc-search-card-right">
+                            <span class="cc-search-card-fecha"><t t-esc="item.fecha_display"/></span>
+                            <span class="cc-search-card-accion">
+                                <t t-esc="item.accion_label"/> →
+                            </span>
+                        </div>
+                    </div>
+                </t>
+            </t>
+
+        </t>
+
+        <!-- SIN RESULTADOS -->
+        <t t-elif="state.searchResults &amp;&amp; (!state.searchResults.items || !state.searchResults.items.length)">
+            <div class="cc-search-empty">
+                No se han encontrado resultados para "<t t-esc="state.searchText"/>"
+            </div>
+        </t>
+
+    </t>
+</div>
       <!-- TOP BAR -->
       <div class="cc-topbar">
         <div class="cc-topbar-title">

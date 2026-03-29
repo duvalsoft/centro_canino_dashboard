@@ -380,3 +380,209 @@ class CentroCaninoDashboard(models.AbstractModel):
         for m in meses:
             m['pct'] = round((m['ocupaciones'] / max_ocu) * 100)
         return meses
+    
+
+
+
+
+
+    @api.model
+    def search_recepcion(self, text):
+        """
+        Búsqueda unificada para recepción.
+        Devuelve resultados agrupados en: vivo, espera, historico.
+        """
+        if not text or len(text) < 3:
+            return {'cliente': None, 'pets': None, 'items': []}
+
+        text = text.strip()
+        today = fields.Date.today()
+
+        # ── Encontrar cliente y perros ─────────────────────────────────────
+        Partner = self.env['res.partner']
+        cliente = Partner.search([
+            '|', '|', '|',
+            ('name',   'ilike', text),
+            ('phone',  'ilike', text),
+            ('mobile', 'ilike', text),
+            ('email',  'ilike', text),
+        ], limit=1)
+
+        Pet = self.env['pet.information']
+        pets = Pet.search([('name', 'ilike', text)])
+        if cliente:
+            pets |= Pet.search([('customer_id', '=', cliente.id)])
+
+        if not cliente and not pets:
+            return {'cliente': None, 'pets': None, 'items': []}
+
+        items = []
+
+        # ── BLOQUE VIVO: ocupaciones activas ──────────────────────────────
+        Ocup = self.env['centro_canino.ocupacion']
+        domain_ocup = [('estado', '=', '2_in')]
+        if pets:
+            domain_ocup.append(('pet_id', 'in', pets.ids))
+        elif cliente:
+            domain_ocup.append(('cliente_id', '=', cliente.id))
+
+        for oc in Ocup.search(domain_ocup, order='fecha_entrada asc'):
+            items.append(self._search_item(
+                bloque='vivo',
+                pet=oc.pet_id.name,
+                titulo='Estancia activa',
+                descripcion=f'{oc.service_subtype_id.name or ""} · {oc.jaula_actual.name or "Sin jaula"}',
+                fecha=oc.fecha_salida_date,
+                source_model='centro_canino.ocupacion',
+                source_id=oc.id,
+                accion='ver_ocupacion',
+                accion_label='Ver ocupación',
+            ))
+
+        # ── BLOQUE VIVO: bonos activos ────────────────────────────────────
+        SaleLine = self.env['sale.order.line']
+        domain_bono = [
+            ('is_voucher', '=', True),
+            ('order_id.state', 'in', ['sale', 'done']),
+            ('estado_bono', '=', 'activo'),
+        ]
+        if pets:
+            domain_bono.append(('petinfo_id', 'in', pets.ids))
+        elif cliente:
+            domain_bono.append(('order_id.partner_id', '=', cliente.id))
+
+        for bono in SaleLine.search(domain_bono):
+            total    = getattr(bono.product_id, 'session_count', 0) or 0
+            usados   = getattr(bono, 'sessions_used', 0) or 0
+            rest     = max(total - usados, 0)
+            items.append(self._search_item(
+                bloque='vivo',
+                pet=bono.petinfo_id.name if bono.petinfo_id else '-',
+                titulo=f'Bono: {bono.product_id.name}',
+                descripcion=f'{rest} de {total} restantes' if total else 'Bono activo',
+                fecha=None,
+                source_model='sale.order.line',
+                source_id=bono.id,
+                accion='usar_bono',
+                accion_label='Usar bono',
+            ))
+
+        # ── BLOQUE VIVO: matrículas activas ──────────────────────────────
+        Matricula = self.env['escuela.matricula']
+        domain_mat = [('state', 'in', ['activa', 'en_espera'])]
+        if pets:
+            domain_mat.append(('pet_id', 'in', pets.ids))
+        elif cliente:
+            domain_mat.append(('cliente_id', '=', cliente.id))
+
+        for m in Matricula.search(domain_mat):
+            items.append(self._search_item(
+                bloque='vivo',
+                pet=m.pet_id.name if m.pet_id else '-',
+                titulo=f'Matrícula: {m.product_id.name or "Escuela"}',
+                descripcion=f'{len(m.sesion_ids)} sesiones registradas',
+                fecha=m.fecha_inicio,
+                source_model='escuela.matricula',
+                source_id=m.id,
+                accion='ver_matricula',
+                accion_label='Ver matrícula',
+            ))
+
+        # ── BLOQUE ESPERA: reservas pendientes de checkin ─────────────────
+        domain_res = [('estado', '=', '1_reservas')]
+        if pets:
+            domain_res.append(('pet_id', 'in', pets.ids))
+        elif cliente:
+            domain_res.append(('cliente_id', '=', cliente.id))
+
+        for oc in Ocup.search(domain_res, order='fecha_entrada asc'):
+            items.append(self._search_item(
+                bloque='espera',
+                pet=oc.pet_id.name,
+                titulo='Reserva pendiente de entrada',
+                descripcion=oc.service_subtype_id.name or '',
+                fecha=oc.fecha_entrada_date,
+                source_model='centro_canino.ocupacion',
+                source_id=oc.id,
+                accion='checkin',
+                accion_label='Hacer check-in',
+            ))
+
+        # ── BLOQUE ESPERA: presupuestos sin confirmar ─────────────────────
+        Order = self.env['sale.order']
+        domain_ord = [('state', 'in', ['draft', 'sent'])]
+        if cliente:
+            domain_ord.append(('partner_id', '=', cliente.id))
+
+        for order in Order.search(domain_ord, order='date_order asc'):
+            lineas = order.order_line
+            if pets:
+                lineas = lineas.filtered(
+                    lambda l: l.petinfo_id and l.petinfo_id.id in pets.ids
+                )
+            if not lineas and not cliente:
+                continue
+            items.append(self._search_item(
+                bloque='espera',
+                pet=', '.join(
+                    l.petinfo_id.name for l in lineas if l.petinfo_id
+                ) or '-',
+                titulo=f'Presupuesto sin confirmar: {order.name}',
+                descripcion=f'{len(lineas)} líneas · {order.amount_total:.2f}€',
+                fecha=fields.Date.to_date(order.date_order) if order.date_order else None,
+                source_model='sale.order',
+                source_id=order.id,
+                accion='confirmar_checkin',
+                accion_label='Confirmar y hacer check-in',
+            ))
+
+        # ── BLOQUE HISTÓRICO ──────────────────────────────────────────────
+        domain_hist = [('estado', 'in', ['3_salidas', '4_cancelada'])]
+        if pets:
+            domain_hist.append(('pet_id', 'in', pets.ids))
+        elif cliente:
+            domain_hist.append(('cliente_id', '=', cliente.id))
+
+        for oc in Ocup.search(domain_hist, limit=5, order='fecha_salida desc'):
+            items.append(self._search_item(
+                bloque='historico',
+                pet=oc.pet_id.name,
+                titulo='Estancia finalizada',
+                descripcion=oc.service_subtype_id.name or '',
+                fecha=oc.fecha_salida_date,
+                source_model='centro_canino.ocupacion',
+                source_id=oc.id,
+                accion='ver_detalle',
+                accion_label='Ver detalle',
+            ))
+
+        return {
+            'cliente': cliente.name if cliente else None,
+            'pets':    ', '.join(pets.mapped('name')) if pets else None,
+            'items':   items,
+        }
+
+    def _search_item(self, bloque, pet, titulo, descripcion,
+                    fecha, source_model, source_id, accion, accion_label):
+        """Helper para construir un item de resultado de búsqueda."""
+        fecha_display = None
+        if fecha:
+            today = fields.Date.today()
+            if fecha == today:
+                fecha_display = 'Hoy'
+            elif fecha == today + timedelta(days=1):
+                fecha_display = 'Mañana'
+            else:
+                fecha_display = fecha.strftime('%d/%m/%Y') if hasattr(fecha, 'strftime') else str(fecha)
+
+        return {
+            'bloque':       bloque,
+            'pet':          pet or '-',
+            'titulo':       titulo,
+            'descripcion':  descripcion or '',
+            'fecha_display': fecha_display,
+            'source_model': source_model,
+            'source_id':    source_id,
+            'accion':       accion,
+            'accion_label': accion_label,
+        }

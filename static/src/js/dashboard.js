@@ -89,7 +89,13 @@ class CentroCaninoDashboard extends Component {
             filtroSubtipo: null,
             data:          null,
             error:         null,
+            searchText:     "",
+            searchResults:  null,
+            searchLoading:  false,
         });
+
+
+
 
         this.openOcupaciones  = this.openOcupaciones.bind(this);
         this.openBonos        = this.openBonos.bind(this);   // ← NUEVO
@@ -97,6 +103,8 @@ class CentroCaninoDashboard extends Component {
         this.onSubtipoChange  = this.onSubtipoChange.bind(this);
         this.onRefresh        = this.onRefresh.bind(this);
         this.openEscuelas = this.openEscuelas.bind(this);
+        this.onSearchInput  = this.onSearchInput.bind(this);
+        this.clearSearch    = this.clearSearch.bind(this);
 
         onWillStart(() => this._loadData());
     }
@@ -170,6 +178,63 @@ class CentroCaninoDashboard extends Component {
 
     onRefresh() {
         this._loadData();
+    }
+    onSearchInput(ev) {
+        const text = ev.target.value || "";
+        this.state.searchText = text;
+
+        // Limpiar si borra el texto
+        if (text.length < 3) {
+            this.state.searchResults = null;
+            return;
+        }
+
+        // Debounce: espera 400ms desde la última tecla
+        clearTimeout(this._searchTimeout);
+        this._searchTimeout = setTimeout(() => {
+            this._doSearch(text);
+        }, 400);
+    }
+
+    async _doSearch(text) {
+        this.state.searchLoading = true;
+        try {
+            const results = await this.rpc(
+                "/centro_canino/dashboard/search", { text }
+            );
+            this.state.searchResults = results;
+        } catch (e) {
+            console.error("Search error:", e);
+            this.state.searchResults = null;
+        } finally {
+            this.state.searchLoading = false;
+        }
+    }
+
+    clearSearch() {
+        this.state.searchText    = "";
+        this.state.searchResults = null;
+    }
+
+    async openSearchResult(result) {
+        if (!result.source_model || !result.source_id) return;
+
+        // Caso especial: confirmar pedido y hacer checkin
+        if (result.accion === "confirmar_checkin") {
+            await this.rpc(
+                "/centro_canino/dashboard/confirmar_checkin",
+                { order_id: result.source_id, pet_id: result.pet_id }
+            );
+        }
+
+        await this.actionService.doAction({
+            type:      "ir.actions.act_window",
+            res_model: result.source_model,
+            res_id:    result.source_id,
+            view_mode: "form",
+            views:     [[false, "form"]],
+            target:    "current",
+        });
     }
 
     // ── NUEVO: abre la vista de bonos activos ────────────────────────────
