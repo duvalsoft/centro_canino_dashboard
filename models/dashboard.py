@@ -20,7 +20,7 @@ class CentroCaninoDashboard(models.AbstractModel):
 
     @api.model
     def get_dashboard_data(self, periodo='30', filtro_subtipo=None):
-        hoy  = fields.Date.today()
+        hoy = fields.Date.today()
         Ocup = self.env['centro_canino.ocupacion']
 
         if periodo == 'all':
@@ -43,18 +43,134 @@ class CentroCaninoDashboard(models.AbstractModel):
                 return [('service_subtype_id', '=', int(filtro_subtipo))]
             return []
 
-        # ── HOY ──────────────────────────────────────────────────────
-        ocupaciones_in  = Ocup.search_count([('estado', '=', '2_in')] + subtipo_filter())
-        total_bungalows = self.env['centro_canino_tumburu.bungalow'].search_count([])
-        tasa_ocupacion  = round((ocupaciones_in / total_bungalows * 100), 2) if total_bungalows else 0
+        # ── AHORA (REAL / VOLÁTIL) ──────────────────────────────────────
+        domain_ahora = [('estado', '=', '2_in')] + subtipo_filter()
+        ocupaciones_ahora_recs = Ocup.search(domain_ahora)
+        ocupaciones_ahora = len(ocupaciones_ahora_recs)
 
-        checkin_previstos  = Ocup.search_count(
+        jaulas_ahora_ids = set()
+        con_pernocta_ahora = 0
+        sin_pernocta_ahora = 0
+        desglose_subtipos_ahora = {}
+
+        for o in ocupaciones_ahora_recs:
+            subtipo = o.service_subtype_id
+            overnight = bool(subtipo and subtipo.overnight_stay)
+
+            if o.jaula_actual:
+                jaulas_ahora_ids.add(o.jaula_actual.id)
+
+            if overnight:
+                con_pernocta_ahora += 1
+            else:
+                sin_pernocta_ahora += 1
+
+            subtipo_id = subtipo.id if subtipo else 0
+            subtipo_name = subtipo.name if subtipo else 'Sin subtipo'
+
+            if subtipo_id not in desglose_subtipos_ahora:
+                desglose_subtipos_ahora[subtipo_id] = {
+                    'id': subtipo_id,
+                    'name': subtipo_name,
+                    'count': 0,
+                    'overnight_stay': overnight,
+                }
+
+            desglose_subtipos_ahora[subtipo_id]['count'] += 1
+
+        desglose_subtipos_ahora = sorted(
+            desglose_subtipos_ahora.values(),
+            key=lambda x: (-x['count'], x['name'])
+        )
+
+        total_bungalows = self.env['centro_canino_tumburu.bungalow'].search_count([])
+        tasa_ocupacion = round((len(jaulas_ahora_ids) / total_bungalows * 100), 2) if total_bungalows else 0
+
+        ahora_data = {
+            'ocupaciones': ocupaciones_ahora,
+            'bungalows_ocupados': len(jaulas_ahora_ids),
+            'tasa_ocupacion': tasa_ocupacion,
+            'total_bungalows': total_bungalows,
+            'desglose': {
+                'con_pernocta': con_pernocta_ahora,
+                'sin_pernocta': sin_pernocta_ahora,
+                'subtipos': desglose_subtipos_ahora,
+            },
+        }
+
+        # ── HOY (PLAN / ESTABLE) ────────────────────────────────────────
+        domain_hoy = [
+            ('estado', '!=', '4_cancelada'),
+            ('fecha_entrada_date', '<=', hoy),
+            ('fecha_salida_date', '>=', hoy),
+        ] + subtipo_filter()
+
+        ocupaciones_hoy_recs = Ocup.search(domain_hoy)
+        ocupaciones_hoy = len(ocupaciones_hoy_recs)
+
+        con_pernocta_hoy = 0
+        sin_pernocta_hoy = 0
+        desglose_subtipos_hoy = {}
+
+        # Estimación de bungalows necesarios para hoy:
+        # - si hay sale_order y casas_separadas = False, agrupamos por pedido
+        # - si casas_separadas = True, cada ocupación cuenta por separado
+        # - si no hay pedido, cada ocupación cuenta por separado
+        grupos_bungalow_hoy = {}
+
+        for o in ocupaciones_hoy_recs:
+            subtipo = o.service_subtype_id
+            overnight = bool(subtipo and subtipo.overnight_stay)
+
+            if overnight:
+                con_pernocta_hoy += 1
+            else:
+                sin_pernocta_hoy += 1
+
+            subtipo_id = subtipo.id if subtipo else 0
+            subtipo_name = subtipo.name if subtipo else 'Sin subtipo'
+
+            if subtipo_id not in desglose_subtipos_hoy:
+                desglose_subtipos_hoy[subtipo_id] = {
+                    'id': subtipo_id,
+                    'name': subtipo_name,
+                    'count': 0,
+                    'overnight_stay': overnight,
+                }
+
+            desglose_subtipos_hoy[subtipo_id]['count'] += 1
+
+            # Solo estimamos bungalow para ocupaciones con pernocta
+            if overnight:
+                if o.sale_order_id and not o.sale_order_id.casas_separadas:
+                    key = ('order', o.sale_order_id.id)
+                else:
+                    key = ('ocup', o.id)
+                grupos_bungalow_hoy[key] = True
+
+        desglose_subtipos_hoy = sorted(
+            desglose_subtipos_hoy.values(),
+            key=lambda x: (-x['count'], x['name'])
+        )
+
+        hoy_data = {
+            'ocupaciones': ocupaciones_hoy,
+            'bungalows_estimados': len(grupos_bungalow_hoy),
+            'desglose': {
+                'con_pernocta': con_pernocta_hoy,
+                'sin_pernocta': sin_pernocta_hoy,
+                'subtipos': desglose_subtipos_hoy,
+            },
+        }
+
+        # ── MOVIMIENTO DEL DÍA ──────────────────────────────────────────
+        checkin_previstos = Ocup.search_count(
             [('estado', '!=', '4_cancelada'), ('fecha_entrada_date', '=', hoy)] + subtipo_filter()
         )
         checkin_realizados = Ocup.search_count(
             [('estado', 'in', ['2_in', '3_salidas']), ('fecha_entrada_date', '=', hoy)] + subtipo_filter()
         )
-        checkout_previstos  = Ocup.search_count(
+        checkout_previstos = Ocup.search_count(
             [('estado', '!=', '4_cancelada'), ('fecha_salida_date', '=', hoy)] + subtipo_filter()
         )
         checkout_realizados = Ocup.search_count(
@@ -64,34 +180,32 @@ class CentroCaninoDashboard(models.AbstractModel):
             ('estado', '=', '2_in'),
             '|',
             ('tiene_atencion_medica', '=', True),
-            ('comida_propia_final',   '=', True),
+            ('comida_propia_final', '=', True),
         ] + subtipo_filter())
 
-        hoy_data = {
-            'ocupaciones_in':     ocupaciones_in,
-            'tasa_ocupacion':     tasa_ocupacion,
-            'total_bungalows':    total_bungalows,
-            'checkin_previstos':  checkin_previstos,
+        movimiento_data = {
+            'checkin_previstos': checkin_previstos,
             'checkin_realizados': checkin_realizados,
             'checkin_pendientes': max(0, checkin_previstos - checkin_realizados),
-            'checkout_previstos':  checkout_previstos,
+            'checkout_previstos': checkout_previstos,
             'checkout_realizados': checkout_realizados,
             'checkout_pendientes': max(0, checkout_previstos - checkout_realizados),
-            'alertas_medicas':    alertas_medicas,
+            'alertas_medicas': alertas_medicas,
         }
 
-        # ── ESCUELAS ─────────────────────────────────────────────────
-        Matricula    = self.env['escuela.matricula']
-        Sesion       = self.env['escuela.sesion']
-        hoy_inicio   = fields.Datetime.from_string(str(hoy) + ' 00:00:00')
-        hoy_fin      = fields.Datetime.from_string(str(hoy) + ' 23:59:59')
+        # ── ESCUELAS ────────────────────────────────────────────────────
+        Matricula = self.env['escuela.matricula']
+        Sesion = self.env['escuela.sesion']
+        hoy_inicio = fields.Datetime.from_string(str(hoy) + ' 00:00:00')
+        hoy_fin = fields.Datetime.from_string(str(hoy) + ' 23:59:59')
+
+        domain_matriculas_vivas = [('state', 'in', ['activa', 'en_espera'])]
 
         escuelas_data = {
-            'matriculas_activas':       Matricula.search_count([('state', '=', 'activa')]),
-            'perros_en_centro_escuela': Matricula.search_count([
-                ('state', '=', 'activa'),
-                ('perro_en_centro', '=', True),
-            ]),
+            'matriculas_activas': Matricula.search_count(domain_matriculas_vivas),
+            'perros_en_centro_escuela': Matricula.search_count(
+                domain_matriculas_vivas + [('perro_en_centro', '=', True)]
+            ),
             'sesiones_hoy': Sesion.search_count([
                 ('date_start', '>=', hoy_inicio),
                 ('date_start', '<=', hoy_fin),
@@ -99,9 +213,9 @@ class CentroCaninoDashboard(models.AbstractModel):
             ]),
         }
 
-        # ── PERIODO ──────────────────────────────────────────────────
+        # ── PERIODO ─────────────────────────────────────────────────────
         total_reservas = Ocup.search_count(base_domain())
-        canceladas     = Ocup.search_count(base_domain([('estado', '=', '4_cancelada')]))
+        canceladas = Ocup.search_count(base_domain([('estado', '=', '4_cancelada')]))
 
         query_ingresos = """
             SELECT COALESCE(SUM(so.amount_untaxed), 0)
@@ -117,7 +231,7 @@ class CentroCaninoDashboard(models.AbstractModel):
                 AND EXISTS (
                     SELECT 1 FROM sale_order_line sol2
                     WHERE sol2.order_id = so.id
-                      AND sol2.service_subtype_id = %s
+                    AND sol2.service_subtype_id = %s
                 )
             """
             params.append(int(filtro_subtipo))
@@ -134,66 +248,68 @@ class CentroCaninoDashboard(models.AbstractModel):
 
         periodo_data = {
             'total_reservas': total_reservas,
-            'canceladas':     canceladas,
-            'ingresos':       float(ingresos),
-            'dias_promedio':  dias_promedio,
-            'label_periodo':  self._label_periodo(periodo),
+            'canceladas': canceladas,
+            'ingresos': float(ingresos),
+            'dias_promedio': dias_promedio,
+            'label_periodo': self._label_periodo(periodo),
         }
 
-        # ── GRÁFICA DIARIA ───────────────────────────────────────────
-        dias_grafica   = min(int(periodo) if periodo != 'all' else 30, 30)
+        # ── GRÁFICA DIARIA ──────────────────────────────────────────────
+        dias_grafica = min(int(periodo) if periodo != 'all' else 30, 30)
         grafica_diaria = []
         for i in range(dias_grafica - 1, -1, -1):
-            dia   = hoy - timedelta(days=i)
+            dia = hoy - timedelta(days=i)
             count = Ocup.search_count(
                 [('fecha_entrada_date', '=', dia)] + subtipo_filter()
             )
             grafica_diaria.append({
-                'fecha':    dia.strftime('%d/%m'),
+                'fecha': dia.strftime('%d/%m'),
                 'reservas': count,
             })
 
-        # ── GRÁFICA SUBTIPO ──────────────────────────────────────────
+        # ── GRÁFICA SUBTIPO ─────────────────────────────────────────────
         grafica_subtipo = self._get_distribucion_subtipo(base_domain(), total_reservas)
 
-        # ── ÚLTIMAS OCUPACIONES ──────────────────────────────────────
-        ultimas      = Ocup.search(base_domain(), order='fecha_entrada desc', limit=8)
+        # ── ÚLTIMAS OCUPACIONES ─────────────────────────────────────────
+        ultimas = Ocup.search(base_domain(), order='fecha_entrada desc', limit=8)
         ultimas_data = []
         for o in ultimas:
             ultimas_data.append({
-                'id':          o.id,
-                'perro':       o.pet_id.name if o.pet_id else '-',
-                'cliente':     o.cliente_id.name if o.cliente_id else '-',
-                'subtipo':     o.service_subtype_id.name if o.service_subtype_id else '-',
-                'entrada':     o.fecha_entrada.strftime('%d/%m/%Y %H:%M') if o.fecha_entrada else '-',
-                'salida':      o.fecha_salida.strftime('%d/%m/%Y %H:%M') if o.fecha_salida else '-',
-                'estado':      o.estado,
+                'id': o.id,
+                'perro': o.pet_id.name if o.pet_id else '-',
+                'cliente': o.cliente_id.name if o.cliente_id else '-',
+                'subtipo': o.service_subtype_id.name if o.service_subtype_id else '-',
+                'entrada': o.fecha_entrada.strftime('%d/%m/%Y %H:%M') if o.fecha_entrada else '-',
+                'salida': o.fecha_salida.strftime('%d/%m/%Y %H:%M') if o.fecha_salida else '-',
+                'estado': o.estado,
                 'estado_label': dict(o._fields['estado'].selection).get(o.estado, o.estado),
-                'jaula':       o.jaula_actual.name if o.jaula_actual else '-',
-                'zona':        o.zona_actual.name if o.zona_actual else '-',
+                'jaula': o.jaula_actual.name if o.jaula_actual else '-',
+                'zona': o.zona_actual.name if o.zona_actual else '-',
             })
 
-        # ── SUBTIPOS ─────────────────────────────────────────────────
+        # ── SUBTIPOS ────────────────────────────────────────────────────
         subtipos = [
             {'id': s.id, 'name': s.name}
             for s in self.env['service.subtype'].search([])
         ]
 
-        # ── RETORNO ──────────────────────────────────────────────────
+        # ── RETORNO ─────────────────────────────────────────────────────
         return {
-            'hoy':                     hoy_data,
-            'escuelas':                escuelas_data,
-            'periodo':                 periodo_data,
-            'grafica_diaria':          grafica_diaria,
-            'grafica_subtipo':         grafica_subtipo,
-            'grafica_ingresos_mes':    self._get_grafica_mensual_ingresos(filtro_subtipo),
+            'ahora': ahora_data,
+            'hoy': hoy_data,
+            'movimiento': movimiento_data,
+            'escuelas': escuelas_data,
+            'periodo': periodo_data,
+            'grafica_diaria': grafica_diaria,
+            'grafica_subtipo': grafica_subtipo,
+            'grafica_ingresos_mes': self._get_grafica_mensual_ingresos(filtro_subtipo),
             'grafica_ocupaciones_mes': self._get_grafica_mensual_ocupaciones(filtro_subtipo),
-            'ultimas':                 ultimas_data,
-            'subtipos':                subtipos,
-            'bonos_activos':           self.env['sale.order.line'].search_count([
-                ('is_voucher',     '=', True),
+            'ultimas': ultimas_data,
+            'subtipos': subtipos,
+            'bonos_activos': self.env['sale.order.line'].search_count([
+                ('is_voucher', '=', True),
                 ('order_id.state', 'in', ['sale', 'done']),
-                ('estado_bono',    '=', 'activo'),
+                ('estado_bono', '=', 'activo'),
             ]),
             'user_is_manager': self.env.user.has_group(
                 'centro_canino_tumburu.group_pet_sitter_manager'
@@ -212,25 +328,25 @@ class CentroCaninoDashboard(models.AbstractModel):
         if not text or len(text) < 3:
             return []
 
-        text     = text.strip()
-        Pet      = self.env['pet.information']
-        Partner  = self.env['res.partner']
+        text = text.strip()
+        Pet = self.env['pet.information']
+        Partner = self.env['res.partner']
 
         pets = Pet.search([('name', 'ilike', text)], limit=20)
 
         clientes = Partner.search([
             '|', '|', '|',
-            ('name',   'ilike', text),
-            ('phone',  'ilike', text),
+            ('name', 'ilike', text),
+            ('phone', 'ilike', text),
             ('mobile', 'ilike', text),
-            ('email',  'ilike', text),
+            ('email', 'ilike', text),
         ], limit=10)
 
         if clientes:
             pets |= Pet.search([('customer_id', 'in', clientes.ids)])
 
         candidatos = []
-        vistos     = set()
+        vistos = set()
 
         for pet in pets:
             key = (pet.id, pet.customer_id.id if pet.customer_id else 0)
@@ -248,11 +364,11 @@ class CentroCaninoDashboard(models.AbstractModel):
 
             partner = pet.customer_id
             candidatos.append({
-                'pet_id':        pet.id,
-                'pet_name':      pet.name,
-                'pet_image':     imagen,
-                'partner_id':    partner.id if partner else False,
-                'partner_name':  partner.name if partner else 'Sin propietario',
+                'pet_id': pet.id,
+                'pet_name': pet.name,
+                'pet_image': imagen,
+                'partner_id': partner.id if partner else False,
+                'partner_name': partner.name if partner else 'Sin propietario',
                 'partner_phone': partner.mobile or partner.phone or False,
             })
 
@@ -267,7 +383,7 @@ class CentroCaninoDashboard(models.AbstractModel):
         """
         Devuelve la ficha operativa completa para un cliente/perro concreto.
         """
-        Ocup  = self.env['centro_canino.ocupacion']
+        Ocup = self.env['centro_canino.ocupacion']
         items = []
 
         partner = (
@@ -287,7 +403,7 @@ class CentroCaninoDashboard(models.AbstractModel):
             ])
         elif pet and pet.id:
             todos_pets = pet
-            partner    = pet.customer_id
+            partner = pet.customer_id
         else:
             return {'cliente': None, 'telefono': None, 'items': []}
 
@@ -302,7 +418,7 @@ class CentroCaninoDashboard(models.AbstractModel):
             order='fecha_entrada asc'
         ):
             subtipo = oc.service_subtype_id.name or ''
-            jaula   = oc.jaula_actual.name or 'Sin jaula'
+            jaula = oc.jaula_actual.name or 'Sin jaula'
             items.append(self._search_item(
                 bloque='vivo',
                 pet=oc.pet_id.name,
@@ -318,15 +434,15 @@ class CentroCaninoDashboard(models.AbstractModel):
         # ── VIVOS: bonos activos ──────────────────────────────────────
         SaleLine = self.env['sale.order.line']
         for bono in SaleLine.search([
-            ('is_voucher',     '=', True),
+            ('is_voucher', '=', True),
             ('order_id.state', 'in', ['sale', 'done']),
-            ('estado_bono',    '=', 'activo'),
-            ('petinfo_id',     'in', pet_ids),
+            ('estado_bono', '=', 'activo'),
+            ('petinfo_id', 'in', pet_ids),
         ]):
-            total  = getattr(bono.product_id, 'session_count', 0) or 0
+            total = getattr(bono.product_id, 'session_count', 0) or 0
             usados = getattr(bono, 'sessions_used', 0) or 0
-            rest   = max(total - usados, 0)
-            desc   = (str(rest) + ' de ' + str(total) + ' restantes') if total else 'Bono activo'
+            rest = max(total - usados, 0)
+            desc = (str(rest) + ' de ' + str(total) + ' restantes') if total else 'Bono activo'
             items.append(self._search_item(
                 bloque='vivo',
                 pet=bono.petinfo_id.name if bono.petinfo_id else '-',
@@ -342,7 +458,7 @@ class CentroCaninoDashboard(models.AbstractModel):
         # ── VIVOS: matrículas activas ─────────────────────────────────
         Matricula = self.env['escuela.matricula']
         for m in Matricula.search([
-            ('state',  'in', ['activa', 'en_espera']),
+            ('state', 'in', ['activa', 'en_espera']),
             ('pet_id', 'in', pet_ids),
         ]):
             items.append(self._search_item(
@@ -378,9 +494,9 @@ class CentroCaninoDashboard(models.AbstractModel):
         if partner and partner.id:
             Order = self.env['sale.order']
             for order in Order.search([
-                ('state',      'in', ['draft', 'sent']),
-                ('partner_id', '=',  partner.id),
-            ], order='date_order asc'):
+                ('state', 'in', ['draft', 'sent']),
+                ('partner_id', '=', partner.id),
+            ], order='date_order desc'):
                 lineas_pet = order.order_line.filtered(
                     lambda l: l.petinfo_id and l.petinfo_id.id in pet_ids
                 )
@@ -424,9 +540,9 @@ class CentroCaninoDashboard(models.AbstractModel):
             ))
 
         return {
-            'cliente':  partner.name if partner and partner.id else None,
+            'cliente': partner.name if partner and partner.id else None,
             'telefono': (partner.mobile or partner.phone or None) if partner and partner.id else None,
-            'items':    items,
+            'items': items,
         }
 
     # ================================================================ #
@@ -449,35 +565,35 @@ class CentroCaninoDashboard(models.AbstractModel):
                     else str(fecha)
                 )
         return {
-            'bloque':        bloque,
-            'pet':           pet or '-',
-            'titulo':        titulo,
-            'descripcion':   descripcion or '',
+            'bloque': bloque,
+            'pet': pet or '-',
+            'titulo': titulo,
+            'descripcion': descripcion or '',
             'fecha_display': fecha_display,
-            'source_model':  source_model,
-            'source_id':     source_id,
-            'accion':        accion,
-            'accion_label':  accion_label,
+            'source_model': source_model,
+            'source_id': source_id,
+            'accion': accion,
+            'accion_label': accion_label,
         }
 
     def _label_periodo(self, periodo):
         labels = {
-            '7':   'Ultimos 7 dias',
-            '30':  'Ultimos 30 dias',
-            '90':  'Ultimos 90 dias',
+            '7': 'Ultimos 7 dias',
+            '30': 'Ultimos 30 dias',
+            '90': 'Ultimos 90 dias',
             '365': 'Este ano',
             'all': 'Todo el historial',
         }
         return labels.get(str(periodo), 'Ultimos ' + str(periodo) + ' dias')
 
     def _get_distribucion_subtipo(self, base_domain, total):
-        Ocup   = self.env['centro_canino.ocupacion']
-        ocups  = Ocup.search(base_domain)
+        Ocup = self.env['centro_canino.ocupacion']
+        ocups = Ocup.search(base_domain)
         grupos = {}
         for o in ocups:
-            sid   = o.service_subtype_id.id
+            sid = o.service_subtype_id.id if o.service_subtype_id else 0
             sname = o.service_subtype_id.name if o.service_subtype_id else 'Sin subtipo'
-            key   = (sid, sname)
+            key = (sid, sname)
             grupos[key] = grupos.get(key, 0) + 1
 
         colores = [
@@ -490,16 +606,16 @@ class CentroCaninoDashboard(models.AbstractModel):
         ):
             pct = round(count / total * 100, 1) if total else 0
             resultado.append({
-                'id':    sid,
-                'name':  sname,
+                'id': sid,
+                'name': sname,
                 'count': count,
-                'pct':   pct,
+                'pct': pct,
                 'color': colores[idx % len(colores)],
             })
         return resultado
 
     def _get_grafica_mensual_ingresos(self, filtro_subtipo=None):
-        hoy   = fields.Date.today()
+        hoy = fields.Date.today()
         meses = []
         for i in range(11, -1, -1):
             mes_ref = hoy.replace(day=1) - timedelta(days=i * 28)
@@ -526,11 +642,11 @@ class CentroCaninoDashboard(models.AbstractModel):
             self.env.cr.execute(query, params)
             total = float(self.env.cr.fetchone()[0] or 0)
             meses.append({
-                'mes':          mes_ref.strftime('%b %Y'),
-                'mes_corto':    mes_ref.strftime('%b'),
-                'ingresos':     total,
+                'mes': mes_ref.strftime('%b %Y'),
+                'mes_corto': mes_ref.strftime('%b'),
+                'ingresos': total,
                 'ingresos_fmt': '{:,.0f}EUR'.format(total).replace(',', '.'),
-                'pct':          0,
+                'pct': 0,
             })
 
         max_ing = max((m['ingresos'] for m in meses), default=1) or 1
@@ -539,7 +655,7 @@ class CentroCaninoDashboard(models.AbstractModel):
         return meses
 
     def _get_grafica_mensual_ocupaciones(self, filtro_subtipo=None):
-        hoy  = fields.Date.today()
+        hoy = fields.Date.today()
         Ocup = self.env['centro_canino.ocupacion']
         meses = []
         for i in range(11, -1, -1):
@@ -559,10 +675,10 @@ class CentroCaninoDashboard(models.AbstractModel):
 
             count = Ocup.search_count(domain)
             meses.append({
-                'mes':         mes_ref.strftime('%b %Y'),
-                'mes_corto':   mes_ref.strftime('%b'),
+                'mes': mes_ref.strftime('%b %Y'),
+                'mes_corto': mes_ref.strftime('%b'),
                 'ocupaciones': count,
-                'pct':         0,
+                'pct': 0,
             })
 
         max_ocu = max((m['ocupaciones'] for m in meses), default=1) or 1

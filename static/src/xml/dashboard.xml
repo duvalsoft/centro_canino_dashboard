@@ -254,104 +254,176 @@
            FILA 1 – KPIs HOY
            Visible para: Pet Sitter User + Pet Sitter Manager
       ═══════════════════════════════════════════════════════════════════ -->
-      <div class="cc-section">
-        <span class="cc-badge">Hoy</span>
-        <div class="cc-metrics">
+      <!-- ════════════════════════════════════════════════════════════════
+     FILA 1 – KPIs OPERATIVA DIARIA
+     Visible para: Pet Sitter User + Pet Sitter Manager
+═══════════════════════════════════════════════════════════════════ -->
+<div class="cc-section">
+  <span class="cc-badge">Operativa diaria</span>
+  <div class="cc-metrics">
 
-          <div class="cc-metric" t-on-click="() => openOcupaciones('in')">
-            <div class="cc-metric-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-                <path d="M4.5 11a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM19.5 11a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"/>
-                <path d="M8.5 7a4 4 0 017 0"/>
-                <ellipse cx="12" cy="16" rx="5" ry="4"/>
-                <path d="M9 20c0 1.1.9 2 2 2h2a2 2 0 002-2"/>
-              </svg>
-            </div>
-            <span class="cc-metric-label">Hoy</span>
-            <span class="cc-metric-value"><t t-esc="state.data.hoy.ocupaciones_in"/></span>
-          </div>
-
-          <div class="cc-metric">
-            <div class="cc-metric-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-                <rect x="3" y="3" width="7" height="7" rx="1"/>
-                <rect x="14" y="3" width="7" height="7" rx="1"/>
-                <rect x="3" y="14" width="7" height="7" rx="1"/>
-                <rect x="14" y="14" width="7" height="7" rx="1"/>
-              </svg>
-            </div>
-            <span class="cc-metric-label">Ocupación</span>
-            <span class="cc-metric-value">
-              <t t-esc="state.data.hoy.tasa_ocupacion"/>%
-            </span>
-            <span class="cc-metric-sub">
-              <t t-esc="state.data.hoy.ocupaciones_in"/> /
-              <t t-esc="state.data.hoy.total_bungalows"/> jaulas
-            </span>
-          </div>
-
-          <div class="cc-metric" t-on-click="() => openOcupaciones('checkin')">
-            <div class="cc-metric-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-                <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/>
-              </svg>
-            </div>
-            <span class="cc-metric-label">Entradas hoy</span>
-            <span class="cc-metric-value">
-              <t t-esc="state.data.hoy.checkin_realizados"/>/<t t-esc="state.data.hoy.checkin_previstos"/>
-            </span>
-            <span class="cc-metric-sub">
-              Pendientes:
-              <t t-esc="state.data.hoy.checkin_pendientes"/>
-            </span>
-          </div>
-
-            <div class="cc-metric" t-on-click="() => openOcupaciones('checkout')">
-              <div class="cc-metric-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
-                </svg>
-              </div>
-              <span class="cc-metric-label">Salidas hoy</span>
-              <span class="cc-metric-value">
-                <t t-esc="state.data.hoy.checkout_realizados"/>/<t t-esc="state.data.hoy.checkout_previstos"/>
-              </span>
-              <span class="cc-metric-sub">
-                Pendientes:
-                <t t-esc="state.data.hoy.checkout_pendientes"/>
-              </span>
-            </div>
-          <div class="cc-metric cc-metric-alert"
-               t-att-class="state.data.hoy.alertas_medicas > 0 ? 'cc-metric cc-metric-alert' : 'cc-metric'"
-               t-on-click="() => openOcupaciones('alertas')">
-            <div class="cc-metric-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-              </svg>
-            </div>
-            <span class="cc-metric-label">Cuidados especiales</span>
-            <span t-att-class="state.data.hoy.alertas_medicas > 0 ? 'cc-metric-value cc-alert' : 'cc-metric-value'">
-              <t t-esc="state.data.hoy.alertas_medicas"/>
-            </span>
-          </div>
-
-          <div class="cc-metric cc-metric-bonos" t-on-click="() => openBonos()">
-            <div class="cc-metric-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-                <rect x="2" y="7" width="20" height="10" rx="2"/>
-                <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
-                <line x1="12" y1="12" x2="12" y2="12" stroke-width="3"/>
-                <path d="M8 12h.01M12 12h.01M16 12h.01" stroke-width="2.5" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <span class="cc-metric-label">Bonos con saldo</span>
-            <span t-att-class="state.data.bonos_activos > 0 ? 'cc-metric-value cc-bonos' : 'cc-metric-value'">
-              <t t-esc="state.data.bonos_activos"/>
-            </span>
-          </div>
-
-        </div>
+    <!-- AHORA -->
+    <div class="cc-metric" t-on-click="() => openOcupaciones('in')">
+      <div class="cc-metric-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M4.5 11a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM19.5 11a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"/>
+          <path d="M8.5 7a4 4 0 017 0"/>
+          <ellipse cx="12" cy="16" rx="5" ry="4"/>
+          <path d="M9 20c0 1.1.9 2 2 2h2a2 2 0 002-2"/>
+        </svg>
       </div>
+
+      <span class="cc-metric-label">Ahora</span>
+      <span class="cc-metric-value">
+        <t t-esc="state.data.ahora.ocupaciones"/>
+      </span>
+
+      <span class="cc-metric-sub">
+        <t t-esc="state.data.ahora.bungalows_ocupados"/> bungalows ocupados
+      </span>
+
+      <div class="cc-metric-breakdown">
+        <span class="cc-mini-pill cc-mini-pill-night">
+          🌙 <t t-esc="state.data.ahora.desglose.con_pernocta"/> pernocta
+        </span>
+        <span class="cc-mini-pill cc-mini-pill-day">
+          ☀️ <t t-esc="state.data.ahora.desglose.sin_pernocta"/> sin pernocta
+        </span>
+      </div>
+
+      <div class="cc-metric-breakdown cc-metric-breakdown-subtypes">
+        <t t-foreach="state.data.ahora.desglose.subtipos" t-as="sub" t-key="'ahora-' + sub.id">
+          <span t-att-class="sub.overnight_stay ? 'cc-mini-pill cc-mini-pill-subtype-night' : 'cc-mini-pill cc-mini-pill-subtype-day'">
+            <t t-esc="sub.count"/> <t t-esc="sub.name"/>
+          </span>
+        </t>
+      </div>
+    </div>
+
+    <!-- HOY -->
+    <div class="cc-metric">
+      <div class="cc-metric-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <path d="M16 2v4M8 2v4M3 10h18"/>
+          <circle cx="12" cy="16" r="2" fill="currentColor"/>
+        </svg>
+      </div>
+
+      <span class="cc-metric-label">Hoy</span>
+      <span class="cc-metric-value">
+        <t t-esc="state.data.hoy.ocupaciones"/>
+      </span>
+
+      <span class="cc-metric-sub">
+        <t t-esc="state.data.hoy.bungalows_estimados"/> bungalows estimados
+      </span>
+
+      <div class="cc-metric-breakdown">
+        <span class="cc-mini-pill cc-mini-pill-night">
+          🌙 <t t-esc="state.data.hoy.desglose.con_pernocta"/> pernocta
+        </span>
+        <span class="cc-mini-pill cc-mini-pill-day">
+          ☀️ <t t-esc="state.data.hoy.desglose.sin_pernocta"/> sin pernocta
+        </span>
+      </div>
+
+      <div class="cc-metric-breakdown cc-metric-breakdown-subtypes">
+        <t t-foreach="state.data.hoy.desglose.subtipos" t-as="sub" t-key="'hoy-' + sub.id">
+          <span t-att-class="sub.overnight_stay ? 'cc-mini-pill cc-mini-pill-subtype-night' : 'cc-mini-pill cc-mini-pill-subtype-day'">
+            <t t-esc="sub.count"/> <t t-esc="sub.name"/>
+          </span>
+        </t>
+      </div>
+    </div>
+
+    <!-- OCUPACIÓN REAL -->
+    <div class="cc-metric">
+      <div class="cc-metric-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+      </div>
+      <span class="cc-metric-label">Ocupación</span>
+      <span class="cc-metric-value">
+        <t t-esc="state.data.ahora.tasa_ocupacion"/>%
+      </span>
+      <span class="cc-metric-sub">
+        <t t-esc="state.data.ahora.bungalows_ocupados"/> /
+        <t t-esc="state.data.ahora.total_bungalows"/> bungalows
+      </span>
+    </div>
+
+    <!-- ENTRADAS HOY -->
+    <div class="cc-metric" t-on-click="() => openOcupaciones('checkin')">
+      <div class="cc-metric-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/>
+        </svg>
+      </div>
+      <span class="cc-metric-label">Entradas hoy</span>
+      <span class="cc-metric-value">
+        <t t-esc="state.data.movimiento.checkin_realizados"/>/<t t-esc="state.data.movimiento.checkin_previstos"/>
+      </span>
+      <span class="cc-metric-sub">
+        Pendientes:
+        <t t-esc="state.data.movimiento.checkin_pendientes"/>
+      </span>
+    </div>
+
+    <!-- SALIDAS HOY -->
+    <div class="cc-metric" t-on-click="() => openOcupaciones('checkout')">
+      <div class="cc-metric-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+        </svg>
+      </div>
+      <span class="cc-metric-label">Salidas hoy</span>
+      <span class="cc-metric-value">
+        <t t-esc="state.data.movimiento.checkout_realizados"/>/<t t-esc="state.data.movimiento.checkout_previstos"/>
+      </span>
+      <span class="cc-metric-sub">
+        Pendientes:
+        <t t-esc="state.data.movimiento.checkout_pendientes"/>
+      </span>
+    </div>
+
+    <!-- CUIDADOS ESPECIALES -->
+    <div class="cc-metric cc-metric-alert"
+         t-att-class="state.data.movimiento.alertas_medicas > 0 ? 'cc-metric cc-metric-alert' : 'cc-metric'"
+         t-on-click="() => openOcupaciones('alertas')">
+      <div class="cc-metric-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+      </div>
+      <span class="cc-metric-label">Cuidados especiales</span>
+      <span t-att-class="state.data.movimiento.alertas_medicas > 0 ? 'cc-metric-value cc-alert' : 'cc-metric-value'">
+        <t t-esc="state.data.movimiento.alertas_medicas"/>
+      </span>
+    </div>
+
+    <!-- BONOS -->
+    <div class="cc-metric cc-metric-bonos" t-on-click="() => openBonos()">
+      <div class="cc-metric-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="2" y="7" width="20" height="10" rx="2"/>
+          <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
+          <line x1="12" y1="12" x2="12" y2="12" stroke-width="3"/>
+          <path d="M8 12h.01M12 12h.01M16 12h.01" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="cc-metric-label">Bonos con saldo</span>
+      <span t-att-class="state.data.bonos_activos > 0 ? 'cc-metric-value cc-bonos' : 'cc-metric-value'">
+        <t t-esc="state.data.bonos_activos"/>
+      </span>
+    </div>
+
+  </div>
+</div>
       <!-- ════════════════════════════════════════════════════════════════
            FILA ESCUELAS — Visible para todos
       ═══════════════════════════════════════════════════════════════════ -->

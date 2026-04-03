@@ -83,28 +83,84 @@ class CentroCaninoDashboard extends Component {
         }
     }
 
-    _processData(data) {
+   _processData(data) {
         if (!data) return data;
+
+        data.ahora = data.ahora || {
+            ocupaciones: 0,
+            bungalows_ocupados: 0,
+            tasa_ocupacion: 0,
+            total_bungalows: 0,
+            desglose: {
+                con_pernocta: 0,
+                sin_pernocta: 0,
+                subtipos: [],
+            },
+        };
+
+        data.hoy = data.hoy || {
+            ocupaciones: 0,
+            bungalows_estimados: 0,
+            desglose: {
+                con_pernocta: 0,
+                sin_pernocta: 0,
+                subtipos: [],
+            },
+        };
+
+        data.movimiento = data.movimiento || {
+            checkin_previstos: 0,
+            checkin_realizados: 0,
+            checkin_pendientes: 0,
+            checkout_previstos: 0,
+            checkout_realizados: 0,
+            checkout_pendientes: 0,
+            alertas_medicas: 0,
+        };
+
+        data.ahora.desglose = data.ahora.desglose || {
+            con_pernocta: 0,
+            sin_pernocta: 0,
+            subtipos: [],
+        };
+        data.ahora.desglose.subtipos = data.ahora.desglose.subtipos || [];
+
+        data.hoy.desglose = data.hoy.desglose || {
+            con_pernocta: 0,
+            sin_pernocta: 0,
+            subtipos: [],
+        };
+        data.hoy.desglose.subtipos = data.hoy.desglose.subtipos || [];
+
+        data.periodo = data.periodo || {};
+        data.periodo.ingresos = data.periodo.ingresos || 0;
         data.periodo.ingresos_fmt = formatCurrency(data.periodo.ingresos);
+
         data.ultimas = (data.ultimas || []).map(function(o) {
             return Object.assign({}, o, {
                 estado_label: ESTADO_LABELS[o.estado] || o.estado,
                 estado_class: ESTADO_CLASS[o.estado]  || "badge-reserva",
             });
         });
+
         data.grafica_subtipo = this._calcDonutSegments(data.grafica_subtipo || []);
+
         const maxDia = Math.max.apply(
             null,
             (data.grafica_diaria || []).map(function(d) { return d.reservas; }).concat([1])
         );
+
         data.grafica_diaria = (data.grafica_diaria || []).map(function(d) {
             return Object.assign({}, d, {
                 pct: Math.round((d.reservas / maxDia) * 100),
             });
         });
+
         data.grafica_ingresos_mes    = data.grafica_ingresos_mes    || [];
         data.grafica_ocupaciones_mes = data.grafica_ocupaciones_mes || [];
         data.bonos_activos           = data.bonos_activos           || 0;
+        data.subtipos                = data.subtipos                || [];
+
         return data;
     }
 
@@ -316,28 +372,49 @@ class CentroCaninoDashboard extends Component {
         this.state.selectedPet   = null;
     }
 
-    async openSearchResult(result) {
-        if (!result.source_model || !result.source_id) return;
+async openSearchResult(result) {
+    if (!result.source_model || !result.source_id) return;
 
-        if (result.accion === "confirmar_checkin") {
-            await this.rpc(
-                "/centro_canino/dashboard/confirmar_checkin",
-                {
-                    order_id: result.source_id,
-                    pet_id:   result.pet_id || null,
-                }
-            );
-        }
+    if (result.accion === "confirmar_checkin") {
+        await this.rpc(
+            "/centro_canino/dashboard/confirmar_checkin",
+            {
+                order_id: result.source_id,
+                pet_id: result.pet_id || null,
+            }
+        );
+    }
+
+    if (result.accion === "usar_bono") {
+        const ref = await this.orm.call(
+            "ir.model.data",
+            "check_object_reference",
+            ["centro_canino_tumburu", "view_sale_order_line_bono_form"]
+        );
+
+        const bonoFormViewId = ref && ref[1] ? ref[1] : false;
 
         await this.actionService.doAction({
-            type:      "ir.actions.act_window",
-            res_model: result.source_model,
-            res_id:    result.source_id,
+            type: "ir.actions.act_window",
+            name: "Bono",
+            res_model: "sale.order.line",
+            res_id: result.source_id,
             view_mode: "form",
-            views:     [[false, "form"]],
-            target:    "current",
+            views: bonoFormViewId ? [[bonoFormViewId, "form"]] : [[false, "form"]],
+            target: "current",
         });
+        return;
     }
+
+    await this.actionService.doAction({
+        type: "ir.actions.act_window",
+        res_model: result.source_model,
+        res_id: result.source_id,
+        view_mode: "form",
+        views: [[false, "form"]],
+        target: "current",
+    });
+}
 }
 
 registry.category("actions").add(
